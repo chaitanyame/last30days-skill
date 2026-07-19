@@ -10,7 +10,7 @@
 
 ```bash
 # Clone the repo
-git clone https://github.com/mvanhorn/last30days-skill.git ~/.claude/skills/last30days
+git clone https://github.com/chaitanyame/last30days-skill.git ~/.claude/skills/last30days
 
 # Add your API keys
 mkdir -p ~/.config/last30days
@@ -382,7 +382,7 @@ Then: a prompt card slides in showing a sample output.
 SCENE 5 (40-50s): Call to Action
 Zoom out slightly. Everything fades except the logo.
 Text animates in: "Research any topic. Get prompts that work."
-GitHub icon + "github.com/mvanhorn/last30days-skill"
+GitHub icon + "github.com/chaitanyame/last30days-skill"
 Tagline: "A Claude Code Skill"
 
 STYLE NOTES:
@@ -716,6 +716,119 @@ The skill uses:
 
 ---
 
-*30 days of research. 30 seconds of work.*
-
-*Prompt research. Trend discovery. Expert answers.*
+|**30 days of research. 30 seconds of work.**|
+|
+|*Prompt research. Trend discovery. Expert answers.*|
+|
+|---|
+|
+|## CLI Reference|
+|
+|All command-line options for standalone use:|
+|
+|| Flag | Description | Default |
+||------|-------------|---------|
+|| `--emit=MODE` | Output format: `compact`, `json`, `md`, `context`, `path` | `compact` |
+|| `--sources=MODE` | Source selection: `auto`, `reddit`, `x`, `both`, `web` | `auto` |
+|| `--include-web` | Add general web search alongside Reddit/X (lower weighted) | off |
+|| `--quick` | Faster research, fewer sources (8-12 each) | off |
+|| `--deep` | Comprehensive research (50-70 Reddit, 40-60 X) | off |
+|| `--mock` | Use fixture data instead of real API calls (no keys needed) | off |
+|| `--debug` | Verbose logging for troubleshooting | off |
+|
+|**Emit modes explained:**|
+|- `compact` — Clean console summary with top items and stats (default)|
+|- `json` — Full structured JSON output for programmatic use|
+|- `md` — Complete markdown report with all findings and engagement metrics|
+|- `context` — Reusable context snippet for injecting into other AI prompts|
+|- `path` — Print the file path where the last context snippet was saved|
+|
+|**Source modes:**|
+|- `auto` — Automatically use whatever API keys are configured (recommended)|
+|- `reddit` — Reddit only (requires OpenAI API key)|
+|- `x` — X/Twitter only (requires xAI API key)|
+|- `both` — Both Reddit and X|
+|- `web` — General web search only (no API keys needed; Claude handles it)|
+|
+|**Example:**
+|```bash
+|python3 scripts/last30days.py "best AI coding tools" --emit=md --deep --sources=both
+|python3 scripts/last30days.py "midjourney styles" --emit=context --quick --sources=reddit
+|python3 scripts/last30days.py --mock --emit=json "test topic"
+|```|
+|
+|## Embedding in Other Skills|
+|
+|Other AI agent skills can consume last30days research results in several ways:|
+|
+|### Inline Context Injection|
+|```markdown
+|## Recent Research Context
+|!python3 /path/to/last30days/scripts/last30days.py "your topic" --emit=context
+|```|
+|
+|### Read from Saved File|
+|```markdown
+|## Research Context
+|!cat ~/.local/share/last30days/out/last30days.context.md
+|```|
+|
+|### Get Path for Dynamic Loading|
+|```bash
+|CONTEXT_PATH=$(python3 scripts/last30days.py "topic" --emit=path)
+|cat "$CONTEXT_PATH"
+|```|
+|
+|### JSON for Programmatic Consumption|
+|```bash
+|python3 scripts/last30days.py "topic" --emit=json | jq '.reddit[:3]'
+|```|
+|
+|The `context` snippet is the most common embed — it gives another AI model a compact, up-to-date summary of community sentiment on a topic without needing its own API keys.|
+|
+|## Architecture|
+|
+|The orchestrator (`scripts/last30days.py`) coordinates a pipeline of specialized modules in `scripts/lib/`:|
+|
+|| Module | Purpose |
+||--------|---------|
+|| `env.py` | Load and validate API keys from `~/.config/last30days/.env` |
+|| `dates.py` | Date range calculation and confidence scoring |
+|| `cache.py` | 24-hour TTL caching keyed by topic + date range |
+|| `http.py` | stdlib-only HTTP client with retry and debug logging |
+|| `models.py` | Auto-selection of OpenAI/xAI models with 7-day caching |
+|| `openai_reddit.py` | Reddit search via OpenAI Responses API |
+|| `xai_x.py` | X/Twitter search via xAI Responses API |
+|| `websearch.py` | General web search integration |
+|| `reddit_enrich.py` | Fetch real Reddit thread JSON for engagement metrics |
+|| `normalize.py` | Convert raw API responses to canonical schema |
+|| `score.py` | Popularity-aware scoring (relevance + recency + engagement) |
+|| `dedupe.py` | Near-duplicate detection via text similarity |
+|| `render.py` | Generate markdown, JSON, and context-snippet outputs |
+|| `schema.py` | Type definitions and dataclass validation |
+|| `ui.py` | Terminal progress display and banners |
+|
+|### Caching|
+|Research results are cached for 24 hours (keyed by topic + date range). Repeat queries for the same topic within that window return instantly. To bypass the cache, adjust the topic slightly or wait for the TTL to expire.|
+|
+|### Testing|
+|```bash
+|# Run the full test suite (mock mode, no API keys needed)
+|python3 -m pytest tests/ -v
+|
+|# Quick smoke test with mock data
+|python3 scripts/last30days.py --mock "test topic"
+|```|
+|
+|All tests use fixture data and require no external API keys or network access.|
+|
+|## Contributing|
+|
+|Pull requests are welcome. The codebase is pure Python 3 with zero external dependencies — stdlib only, plus optional `pytest` for running tests.|
+|
+|Key design principles:|
+|- **Zero external runtime dependencies** — no pip install needed beyond the Python stdlib|
+|- **Graceful degradation** — partial API failures don't crash the pipeline; error info is surfaced in the report|
+|- **Privacy-first** — no tracking, no analytics, no telemetry. All data stays local|
+|- **Deterministic scoring** — same topic, same data → same results|
+|
